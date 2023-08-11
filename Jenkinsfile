@@ -17,14 +17,11 @@ pipeline {
        stage('Deploy CloudFormation') {
            steps {
                script {
-                   def stackName = 'MyCloudFormationStack'
-                   def templateFile = 'CloudFormation/costOptimization.yml'
-
                    sh """
                        aws cloudformation deploy \\
                            --region \$AWS_DEFAULT_REGION \\
                            --template-file CloudFormation/costOptimization.yml \\
-                           --stack-name \$stackName \\
+                           --stack-name MyCloudFormationStack \\
                    """
                }
            }
