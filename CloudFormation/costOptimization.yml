@@ -23,9 +23,9 @@ Resources:
       BucketName:
         !Join
           - ''
-          - - 'CostOptimization-'
+          - - 'costoptimization-'
             - Ref: AWS::AccountId
-            - '-Bucket'
+            - '-bucket'
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
