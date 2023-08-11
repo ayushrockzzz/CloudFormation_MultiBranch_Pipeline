@@ -16,11 +16,18 @@ pipeline {
 
     stage('Ready for Cost Optimization ?') {
       input {
-        message "Are you ready for Miracle to Happen ?"
-        ok "Go Ahead!"
+        message "Are you running this Framework in your Account for the FIRST TIME ?"
+        ok "Yes!"
       }
       steps {
-        echo 'Accepted'
+        script {
+            sh """
+                aws cloudformation deploy \\
+                    --region \$AWS_DEFAULT_REGION \\
+                    --template-file CloudFormation/s3bucket.yml \\
+                    --stack-name CostOptimizationS3Bucket
+            """
+               }
       }
     }
 

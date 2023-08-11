@@ -17,15 +17,6 @@ Parameters:
     - 700
     - 900
 Resources:
-  S3BucketPRDCostOptimizationBucket:
-    Type: 'AWS::S3::Bucket'
-    Properties:
-      BucketName:
-        !Join
-          - ''
-          - - 'costoptimization-'
-            - Ref: AWS::AccountId
-            - '-bucket'
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -100,7 +91,7 @@ Resources:
       Environment:
         Variables:
           BucketName:
-            Ref: S3BucketPRDCostOptimizationBucket
+            Fn::ImportValue: S3BucketPRDCostOptimizationBucket
       Layers:
       - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
       Timeout:

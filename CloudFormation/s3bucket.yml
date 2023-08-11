@@ -1,0 +1,20 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket creation to store Cost Optimization Reports
+Resources:
+  S3BucketPRDCostOptimizationBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName:
+        !Join
+          - ''
+          - - 'costoptimization-'
+            - Ref: AWS::AccountId
+            - '-bucket'
+Outputs:
+  S3BucketPRDCostOptimizationBucket:
+    Description: S3 bucket to store Cost Optimization Reports
+    Value:
+      Ref: S3BucketPRDCostOptimizationBucket
+    Export:
+      Name: S3BucketPRDCostOptimizationBucket
