@@ -49,33 +49,38 @@ Resources:
         - Arn
       Code:
         ZipFile: |
-          from urllib import response
+          #A cost optimization script
           import boto3
           import pandas as pd
           from datetime import date
-
-          client = boto3.client('ec2')
+          ec2_client = boto3.client('ec2')
           s3 = boto3.resource('s3')
+          #fetching all the volumes
+          volumes = ec2_client.describe_volumes(Filters = [{'Name':'status','Values':['available']}])
+          # 
+          data={'Unused Volume ID with free space':[]}
+          unused_vols_id = []
+          size = []
+          free_size = []
+          account_id = []
 
           date_today = date.today()
           date_today = date_today.strftime("%Y,%m,%d")
           date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
-
-          data={'Snapshot IDs(unassociated with AMI)':[]}
-
-          snapshot_response = client.describe_snapshots(OwnerIds=['self'])
-          snapshot_unassociated = []
-
+          #fetching unused volumeIds
           def lambda_handler(event, context):
-              for i in snapshot_response['Snapshots']:
-                  temp = ''
-                  temp = str(i['Description'])
-                  if(temp.find('ami-')==-1):
-                      snapshot_unassociated.append(i['SnapshotId'])
-                  
-              data['Snapshot IDs(unassociated with AMI)'] = snapshot_unassociated
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              for volume in volumes['Volumes']:
+                  temp = volume['VolumeId']
+                  unused_vols_id.append(temp)
+                  Size = volume['Size']
+                  account_id.append(aws_account_id)
+              data['Account ID'] = account_id
+              data['Volume ID']=unused_vols_id
+              data['Free Space'] = Size
               df=pd.DataFrame.from_dict(data)
-              filename = 'UnassociatedSnapshots' + str(date_today) + '.csv'
+              # df.to_csv('C:\\splunk-csv\\UnusedVolume.csv',index=None)
+              filename = 'UnusedVolume' + str(date_today) + '.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
