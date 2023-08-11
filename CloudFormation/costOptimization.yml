@@ -91,7 +91,7 @@ Resources:
       Environment:
         Variables:
           BucketName:
-            Fn::ImportValue: S3BucketPRDCostOptimizationBucket
+            Fn::ImportValue: S3CostOptimizationBucket
       Layers:
       - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
       Timeout:

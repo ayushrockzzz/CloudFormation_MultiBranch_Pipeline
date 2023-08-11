@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: S3 bucket creation to store Cost Optimization Reports
 Resources:
-  S3BucketPRDCostOptimizationBucket:
+  S3CostOptimizationBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName:
@@ -12,9 +12,9 @@ Resources:
             - Ref: AWS::AccountId
             - '-bucket'
 Outputs:
-  S3BucketPRDCostOptimizationBucket:
+  S3CostOptimizationBucket:
     Description: S3 bucket to store Cost Optimization Reports
     Value:
-      Ref: S3BucketPRDCostOptimizationBucket
+      Ref: S3CostOptimizationBucket
     Export:
-      Name: S3BucketPRDCostOptimizationBucket
+      Name: S3CostOptimizationBucket
