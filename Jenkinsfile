@@ -8,7 +8,7 @@ pipeline {
    }
 
    stages {
-       stage('Gathering Manifest Files') {
+       stage('Gathering Framework Manifest Files') {
            steps {
                checkout scm
            }
@@ -17,20 +17,20 @@ pipeline {
     stage('Ready for Cost Optimization ?') {
       input {
         message "Are you ready for Miracle to Happen ?"
-        ok "Apply"
+        ok "Go Ahead!"
       }
       steps {
         echo 'Accepted'
       }
     }
 
-    stage('Gathering Pre-Processors for Stack Deployment') {
+    stage('Gathering Pre-Processors') {
       steps {
         sh "sleep 5"
       }
     }
 
-       stage('Cost Optimization Lever Deployment in Progress') {
+       stage('Cost Optimization Framework Deployment in Progress') {
            steps {
                script {
                    sh """
@@ -50,10 +50,10 @@ pipeline {
         sh "sleep 180"
       }
     }
-    stage('Done!! Do you want to clear temp and cache files ?') {
+    stage('Done!! Do you want to Cleanup ?') {
       input {
         message "Are you sure?"
-        ok "yes"
+        ok "Go Ahead!"
       }
       steps {
         echo 'Accepted'
