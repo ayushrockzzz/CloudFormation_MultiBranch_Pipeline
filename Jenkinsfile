@@ -22,7 +22,7 @@ pipeline {
                            --region \$AWS_DEFAULT_REGION \\
                            --template-file CloudFormation/costOptimization.yml \\
                            --stack-name MyCloudFormationStack \\
-                           --parameters ParameterKey=MemorySize,ParameterValue=1024 ParameterKey=Timeout,ParameterValue=900
+                           --parameter-overrides MemorySize=1024 Timeout=900
                    """
                }
            }
