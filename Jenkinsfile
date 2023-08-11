@@ -23,7 +23,7 @@ pipeline {
                    sh """
                        aws cloudformation deploy \\
                            --region \$AWS_DEFAULT_REGION \\
-                           --template-file \$templateFile \\
+                           --template-file CloudFormation/costOptimization.yml \\
                            --stack-name \$CostOptimization \\
                    """
                }
