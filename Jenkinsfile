@@ -23,7 +23,7 @@ pipeline {
                            --template-file CloudFormation/costOptimization.yml \\
                            --stack-name MyCloudFormationStack \\
                            --parameter-overrides MemorySize=1024 Timeout=900
-                           --capabilities CAPABILITY_NAMED_IAM=costOptimizationRole
+                           --capabilities CAPABILITY_NAMED_IAM
                    """
                }
            }
