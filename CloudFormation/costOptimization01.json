@@ -1,0 +1,112 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Lambda Function for Cost Optimization scripts",
+    "Parameters": {
+        "MemorySize": {
+            "Type": "String",
+            "AllowedValues": [
+                256,
+                512,
+                1024,
+                2048
+            ]
+        },
+        "Timeout": {
+            "Type": "String",
+            "AllowedValues": [
+                300,
+                500,
+                700,
+                900
+            ]
+        }
+    },
+    "Resources": {
+        "LambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Description": "String",
+                "Policies": [
+                    {
+                        "PolicyName": "costOptimizationRole01",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:*",
+                                        "s3:*",
+                                        "kms:*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "costOptimizationLambdaFunction01": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "FunctionName": "costOptimizationFunction01",
+                "Handler": "index.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "ZipFile": "from urllib import response\nimport boto3\nimport pandas as pd\nfrom datetime import date\n\nclient = boto3.client('ec2')\ns3 = boto3.resource('s3')\n\ndate_today = date.today()\ndate_today = date_today.strftime(\"%Y,%m,%d\")\ndate_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))\n\ndata={'Snapshot IDs(unassociated with AMI)':[]}\n\nsnapshot_response = client.describe_snapshots(OwnerIds=['self'])\nsnapshot_unassociated = []\n\ndef lambda_handler(event, context):\n    for i in snapshot_response['Snapshots']:\n        temp = ''\n        temp = str(i['Description'])\n        if(temp.find('ami-')==-1):\n            snapshot_unassociated.append(i['SnapshotId'])\n        \n    data['Snapshot IDs(unassociated with AMI)'] = snapshot_unassociated\n    df=pd.DataFrame.from_dict(data)\n    filename = 'UnassociatedSnapshots' + str(date_today) + '.csv'\n    foldername = '/tmp/' + filename\n    df.to_csv(foldername,index=None)\n    filename = 'Automation-Reports/'+filename\n    result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket='automation-team-pranad-ayush-jayant-s3-backend', Key=filename)\n    res = result.get('ResponseMetadata')\n    if res.get('HTTPStatusCode') == 200:\n        print('File Uploaded Successfully')\n    else:\n        print('File Not Uploaded')\n"
+                  },
+        "costOptimizationLambdaFunction01ScheduledRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "ScheduleExpression": "rate(2 minutes)",
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "costOptimizationLambdaFunction01",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "TargetFunctionV1"
+                    }
+                ]
+            },
+            "DependsOn": "costOptimizationLambdaFunction01"
+        },
+        "PermissionForEventsToInvokecostOptimizationLambda": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {
+                    "Ref": "costOptimizationLambdaFunction01"
+                },
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "costOptimizationLambdaFunction01ScheduledRule",
+                        "Arn"
+                    ]
+                }
+            }
+        }
+    }
+}
