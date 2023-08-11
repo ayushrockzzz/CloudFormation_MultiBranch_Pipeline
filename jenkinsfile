@@ -2,9 +2,9 @@ pipeline {
    agent any
 
    environment {
-       AWS_DEFAULT_REGION = 'us-east-1'
-       AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
-       AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+       AWS_DEFAULT_REGION = 'ap-south-1'
+       AWS_ACCESS_KEY_ID = credentials('AccessKeyID')
+       AWS_SECRET_ACCESS_KEY = credentials('SecretAccessKey')
    }
 
    stages {
@@ -18,14 +18,13 @@ pipeline {
            steps {
                script {
                    def stackName = 'MyCloudFormationStack'
-                   def templateFile = 'path/to/your/cloudformation-template.yml'
+                   def templateFile = 'CloudFormation\costOptimization.yml'
 
                    sh """
                        aws cloudformation deploy \\
                            --region \$AWS_DEFAULT_REGION \\
                            --template-file \$templateFile \\
-                           --stack-name \$stackName \\
-                           --capabilities CAPABILITY_IAM
+                           --stack-name \$CostOptimization \\
                    """
                }
            }
