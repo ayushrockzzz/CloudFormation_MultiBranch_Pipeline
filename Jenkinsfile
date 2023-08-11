@@ -37,7 +37,7 @@ pipeline {
                        aws cloudformation deploy \\
                            --region \$AWS_DEFAULT_REGION \\
                            --template-file CloudFormation/costOptimization.yml \\
-                           --stack-name MyCloudFormationStack \\
+                           --stack-name CostOptimizationStack \\
                            --parameter-overrides MemorySize=1024 Timeout=900 \\
                            --capabilities CAPABILITY_IAM
                    """
@@ -47,7 +47,7 @@ pipeline {
     stage('Calculating Cost($) Savings!!') {
       steps {
         echo "Cost Optimization lever deployed! Still, we are fetching tentative savings for you!"
-        sh "sleep 10"
+        sh "sleep 180"
       }
     }
     stage('Done!! Do you want to clear temp and cache files ?') {
@@ -65,7 +65,7 @@ pipeline {
                    sh """
                        aws cloudformation delete-stack \\
                            --region \$AWS_DEFAULT_REGION \\
-                           --stack-name MyCloudFormationStack
+                           --stack-name CostOptimizationStack
                    """
                }
            }
