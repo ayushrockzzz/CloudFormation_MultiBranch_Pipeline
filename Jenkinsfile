@@ -46,7 +46,8 @@ pipeline {
                            --template-file CloudFormation/costOptimization.yml \\
                            --stack-name CostOptimizationStack \\
                            --parameter-overrides MemorySize=1024 Timeout=900 \\
-                           --capabilities CAPABILITY_IAM
+                           --capabilities CAPABILITY_IAM \\
+                           --s3-bucket automation-team-pranad-ayush-jayant-s3-backend
                    """
                }
            }
