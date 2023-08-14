@@ -19,12 +19,12 @@ pipeline {
                message "Are you running this Framework in your Account for the FIRST TIME ?"
                ok "Yes!"
                parameters {
-                   booleanParam(name: 'skipCostOptimization', defaultValue: false, description: 'Skip Cost Optimization Stage')
+                   booleanParam(name: 'no', defaultValue: false, description: 'Already Ran')
                }
            }
            steps {
                script {
-                   if (!params.skipCostOptimization) {
+                   if (!params.no) {
                        sh """
                            aws cloudformation deploy \\
                                --region \$AWS_DEFAULT_REGION \\

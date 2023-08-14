@@ -268,7 +268,7 @@ Resources:
   costOptimizationLambdaFunction04:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: UnusedEFS
+      FunctionName: UnusedElasticIps
       Handler: index.lambda_handler
       Role:
         Fn::GetAtt:
