@@ -2,6 +2,7 @@ import boto3
 import csv
 import datetime
 from datetime import date,datetime,timedelta
+import os
 
 
 date_today = date.today()
@@ -13,7 +14,7 @@ def lambda_handler(event, context):
     filename = 'Underutilized-RDS' + str(date_today) + '.csv'
     foldername = '/tmp/' + filename
     list_underutilized_rds_instances(foldername,aws_account_id)
-    s3_bucket_name = 'automation-team-pranad-ayush-jayant-s3-backend'
+    s3_bucket_name = os.environ['BucketName']
     filename = 'Automation-Reports/'+filename
     upload_to_s3(foldername, s3_bucket_name, filename)
     

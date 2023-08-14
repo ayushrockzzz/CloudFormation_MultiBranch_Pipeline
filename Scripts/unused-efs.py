@@ -2,6 +2,7 @@ import boto3
 import csv
 import os
 from datetime import date
+
 date_today = date.today()
 date_today = date_today.strftime("%Y,%m,%d")
 date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
@@ -13,7 +14,7 @@ def lambda_handler(event, context):
     filename = 'UnusedEFS' + str(date_today) + '.csv'
     foldername = '/tmp/' + filename
     unused_volumes_file = list_unused_efs_volumes(foldername,aws_account_id)
-    s3_bucket_name = 'automation-team-pranad-ayush-jayant-s3-backend'
+    s3_bucket_name = os.environ['BucketName']
     filename = 'Automation-Reports/'+filename
     upload_to_s3(unused_volumes_file, s3_bucket_name, filename)
     

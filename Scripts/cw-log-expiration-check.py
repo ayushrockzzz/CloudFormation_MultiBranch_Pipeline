@@ -1,5 +1,6 @@
 import boto3
 import csv
+import os
 import datetime
 from datetime import date,datetime,timedelta
 
@@ -13,7 +14,7 @@ def lambda_handler(event, context):
     filename = 'CWExpirationCheck' + str(date_today) + '.csv'
     foldername = '/tmp/' + filename
     list_log_groups_without_retention_policy(foldername,aws_account_id)
-    s3_bucket_name = 'automation-team-pranad-ayush-jayant-s3-backend'
+    s3_bucket_name = os.environ['BucketName']
     filename = 'Automation-Reports/'+filename
     upload_to_s3(foldername, s3_bucket_name, filename)
 

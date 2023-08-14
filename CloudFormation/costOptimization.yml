@@ -38,10 +38,11 @@ Resources:
             - s3:*
             - kms:*
             Resource: "*"
-  costOptimizationLambdaFunction:
+
+  costOptimizationLambdaFunction01:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: costOptimizationFunction
+      FunctionName: UnassociatedSnapshots
       Handler: index.lambda_handler
       Role:
         Fn::GetAtt:
@@ -101,6 +102,1154 @@ Resources:
       TracingConfig:
         Mode: Active
     DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction02:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnusedRDS
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import csv
+          import datetime
+          from datetime import date,datetime,timedelta
+          import os
+
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              filename = 'UnusedRDS' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              list_unused_stopped_rds_instances(foldername,aws_account_id)
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+              
+          def list_unused_stopped_rds_instances(output_file, aws_account_id):
+              # Initialize Boto3 client for RDS
+              rds_client = boto3.client('rds')
+
+              # Calculate the date one week ago
+              one_week_ago = datetime.now() - timedelta(weeks=1)
+
+              # List all RDS instances
+              response = rds_client.describe_db_instances()
+              db_instances = response['DBInstances']
+
+              # Find unused instances in "stopped" state and write to CSV file
+              unused_stopped_instances_data = []
+
+              for instance in db_instances:
+                  if instance['DBInstanceStatus'] == 'stopped':
+                      instance_creation_time = instance['InstanceCreateTime']
+                      if instance_creation_time < one_week_ago:
+                          unused_stopped_instances_data.append((
+                              instance['DBInstanceIdentifier'],
+                              instance['DBInstanceClass'],
+                              instance['Engine'],
+                              instance['EngineVersion'],
+                              instance['AllocatedStorage'],
+                              instance['AvailabilityZone']
+                          ))
+
+              with open(output_file, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Instance Identifier', 'Instance Class', 'Engine', 'Engine Version', 'Allocated Storage', 'Availability Zone'])
+                  for instance_id, instance_class, engine, engine_version, allocated_storage, availability_zone in unused_stopped_instances_data:
+                      csv_writer.writerow([aws_account_id,instance_id, instance_class, engine, engine_version, allocated_storage, availability_zone])
+
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction03:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnusedEFS
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import csv
+          import os
+          from datetime import date
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          account_id = []
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              filename = 'UnusedEFS' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              unused_volumes_file = list_unused_efs_volumes(foldername,aws_account_id)
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(unused_volumes_file, s3_bucket_name, filename)
+              
+          def list_unused_efs_volumes(output_file,aws_account_id):
+              # Initialize Boto3 clients for EFS and EC2
+              efs_client = boto3.client('efs')
+              ec2_client = boto3.client('ec2')
+
+              # List all EFS file systems
+              response = efs_client.describe_file_systems()
+              file_systems = response['FileSystems']
+              
+              # Retrieve all EFS volumes that are in use
+              used_volumes = set()
+              instances = ec2_client.describe_instances()
+              for reservation in instances['Reservations']:
+                  for instance in reservation['Instances']:
+                      for block_device in instance.get('BlockDeviceMappings', []):
+                          if 'Ebs' in block_device and 'VolumeId' in block_device['Ebs']:
+                              used_volumes.add(block_device['Ebs']['VolumeId'])
+                              
+              # Find and write unused EFS volumes to CSV file
+              unused_volumes = [fs['FileSystemId'] for fs in file_systems if fs['FileSystemId'] not in used_volumes]
+              with open(output_file, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Unused EFS Volumes'])
+                  for volume_id in unused_volumes:
+                      csv_writer.writerow([aws_account_id,volume_id])
+              return output_file
+
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction04:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnusedEFS
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          #A cost optimization script
+          import boto3
+          import pandas as pd
+          from datetime import date
+          import os
+
+
+          #if elastic ip is associated with any EC2 Instance instanceId will be present if elastic ip is not in use then InstanceID will not be there
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          ec2 = boto3.client('ec2')
+          s3 = boto3.resource('s3')
+          response = ec2.describe_addresses()
+          data={'Unused Elastic IPs':[]}
+          unused_eips = []
+          def lambda_handler(event,context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              for address in response['Addresses']:
+                  if 'InstanceId' not in address and 'AssociationId' not in address and 'NetworkInterfaceId' not in address:
+                      unused_eips.append(address['PublicIp'])
+                      account_id.append(aws_account_id)
+              data['Account ID'] = account_id
+              data['Unused Elastic IPs']=unused_eips
+              df=pd.DataFrame.from_dict(data)
+
+              filename = 'UnusedElasticIps' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+              return{
+                      'message': 'success!!'
+                  }
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction05:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: StoppedInstances
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          from difflib import Differ
+          from ipaddress import ip_address
+          import boto3
+          import pandas as pd
+          from datetime import datetime
+          from datetime import date
+          import os
+
+
+          client=boto3.client('ec2')
+          resp=client.describe_instances(Filters=[{'Name':'instance-state-name','Values':['stopped']}])
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+          s3 = boto3.resource('s3')
+          ses_client = boto3.client('ses')
+          instance_name = []
+          instance_id = []
+          Diff_List=[]
+          ip_address_list = []
+
+          def lambda_handler(event, context):
+              account_id = []
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              for i in resp['Reservations']:
+                  for j in i['Instances']:
+                      InstanceId = j['InstanceId']
+                      try:
+                          InstanceTime = j['StateTransitionReason'].split('(')[1].split(' ')[0]
+                      except:
+                          break
+                      temp = date(int(InstanceTime.split('-')[0]),int(InstanceTime.split('-')[1]),int(InstanceTime.split('-')[2]))
+                      day_diff = (date_today-temp).days
+                      if day_diff>=14:
+                          instance_id.append(InstanceId)
+                          Diff_List.append(day_diff)
+                          ip_address_list.append(j['PrivateIpAddress'])
+                          account_id.append(aws_account_id)
+                          try:
+                              for k in j['Tags']:
+                                  try:
+                                      if k['Key']=='Name':
+                                          instance_name.append(k['Value'])
+                                          break
+                                  except:
+                                      break
+                          except:
+                              instance_name.append('--')
+              data={'Account ID':[],'Instance Name':[],'Instance ID':[],'Private IP': [],'Instance is Stopped from(days)':[]}
+              data['Account ID'] = account_id
+              data['Instance Name'] = instance_name
+              data['Instance ID']=instance_id
+              data['Private IP'] = ip_address_list
+              data['Instance is Stopped from(days)']=Diff_List
+              df=pd.DataFrame.from_dict(data)
+              filename = 'StoppedInstances' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction06:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnusedVolume
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          #A cost optimization script
+          import boto3
+          import pandas as pd
+          from datetime import date
+          import os
+
+          ec2_client = boto3.client('ec2')
+          s3 = boto3.resource('s3')
+
+          #fetching all the volumes
+          volumes = ec2_client.describe_volumes(Filters = [{'Name':'status','Values':['available']}])
+          # 
+          data={'Account ID':[],'Volume ID':[],'Free Space':[]}
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+          #fetching unused volumeIds
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              Size = []
+              unused_vols_id = []
+              for volume in volumes['Volumes']:
+                  temp = volume['VolumeId']
+                  unused_vols_id.append(temp)
+                  Size.append(volume['Size'])
+                  account_id.append(aws_account_id)
+              data['Account ID'] = account_id
+              data['Volume ID']=unused_vols_id
+              data['Free Space'] = Size
+              df=pd.DataFrame.from_dict(data)
+              filename = 'UnusedVolume' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction07:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnusedAMI
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          #A cost optimization script
+          import boto3
+          import pandas as pd
+          import datetime
+          from datetime import date
+          import os
+
+          client = boto3.client('ec2')
+          s3 = boto3.resource('s3')
+
+          unused_amis = []
+          ami_age = []
+
+          data={'Account ID':[],'Unused AMI ID':[], 'AMI Age(days old)':[]}
+
+          #date time today
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          response = client.describe_images(Owners=['self'],
+              Filters=[
+                  {
+                      'Name': 'state',
+                      'Values': ['available']
+                  },
+              ]
+          )
+
+          def lambda_handler(event,context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              for i in response['Images']:
+                  temp = date(int(i['CreationDate'].split('T')[0].split('-')[0]),int(i['CreationDate'].split('T')[0].split('-')[1]),int(i['CreationDate'].split('T')[0].split('-')[2]))
+                  day_diff = (date_today-temp).days
+                  if(day_diff>3):
+                      unused_amis.append(i['ImageId'])
+                      ami_age.append(day_diff)
+                      account_id.append(aws_account_id)
+              data['Account ID'] = account_id
+              data['Unused AMI ID']=unused_amis
+              data['AMI Age(days old)'] = ami_age
+              df=pd.DataFrame.from_dict(data)
+              # df.to_csv('\\UnusedAMI.csv',index=None)
+              filename = 'UnusedAMI' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              # filename = filename + filename
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction08:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnderUtilizedEC2
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          #Script for cost optimization; to check weekly avg cpu utilization per instance.
+          import boto3
+          import datetime
+          from datetime import date
+          import pandas as pd
+          import os
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              cw = boto3.client('cloudwatch')
+              client = boto3.client('ec2')
+              s3 = boto3.resource('s3')
+              resp = client.describe_instances(Filters=[{
+                  'Name': 'instance-state-name',
+                  'Values': ['running']
+              }])
+
+              date_today = date.today()
+              date_today = date_today.strftime("%Y,%m,%d")
+              date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+              InstanceIdList = []
+              for reservation in resp['Reservations']:
+                  for instance in reservation['Instances']:
+                      InstanceIdList.append(instance['InstanceId'])
+
+              instance_id_list = []
+              utilization_list = []
+
+              for i in InstanceIdList:
+                  instance_id_list.append(i)
+                  Id = i
+                  result = cw.get_metric_statistics(
+                          Period=86400,
+                          StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=10080),
+                          EndTime=datetime.datetime.utcnow(),
+                          MetricName='CPUUtilization',
+                          Namespace='AWS/EC2',
+                          Statistics=['Average'],
+                          Dimensions=[{'Name': 'InstanceId', 'Value': Id}]
+                  )
+                  dp = result['Datapoints']
+                  m = len(dp)
+                  sumavg = 0
+                  for j in range(0, m):
+                      a = dp[j]
+                      avg = a['Average']
+                      sumavg = sumavg + avg
+                  weekAvg = sumavg/7
+                  weekAvg = "{:.2f}".format(float(weekAvg))
+                  if float(weekAvg)<20.00:
+                      utilization_list.append(str(weekAvg) + '%')
+                      account_id.append(aws_account_id)
+              df = pd.DataFrame({'Account ID': account_id,'Instance ID': instance_id_list, 'Weekly Average CPU Utilization <20%': utilization_list})
+              filename = 'UnderUtilizedEC2' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+              return{
+                  'msg':'success!'
+              }
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction09:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UnderutilizedRDS
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import csv
+          import datetime
+          from datetime import date,datetime,timedelta
+          import os
+
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              filename = 'UnderutilizedRDS' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              list_underutilized_rds_instances(foldername,aws_account_id)
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+              
+          def list_underutilized_rds_instances(output_file,aws_account_id):
+              # Initialize Boto3 clients for RDS and CloudWatch
+              rds_client = boto3.client('rds')
+              cloudwatch_client = boto3.client('cloudwatch')
+
+              # Get list of RDS instances
+              response = rds_client.describe_db_instances()
+              db_instances = response['DBInstances']
+
+              # Calculate the time range for the past week
+              end_time = datetime.now()
+              start_time = end_time - timedelta(days=7)
+
+              # Find underutilized RDS instances
+              underutilized_instances = []
+
+              for db_instance in db_instances:
+                  db_identifier = db_instance['DBInstanceIdentifier']
+                  
+                  # Retrieve CPU utilization metrics for the past week
+                  response = cloudwatch_client.get_metric_statistics(
+                      Namespace='AWS/RDS',
+                      MetricName='CPUUtilization',
+                      Dimensions=[
+                          {'Name': 'DBInstanceIdentifier', 'Value': db_identifier}
+                      ],
+                      StartTime=start_time,
+                      EndTime=end_time,
+                      Period=3600,  # 1-hour granularity
+                      Statistics=['Average']
+                  )
+
+                  # Calculate average CPU utilization
+                  if 'Datapoints' in response:
+                      datapoints = response['Datapoints']
+                      total_utilization = sum(dp['Average'] for dp in datapoints)
+                      average_utilization = total_utilization / len(datapoints)
+                      
+                      # Check if the average utilization is less than 20%
+                      if average_utilization < 20:
+                          underutilized_instances.append((db_identifier, average_utilization))
+
+              # Write underutilized instances to CSV file
+              with open(output_file, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Underutilized RDS Instances', 'Average CPU Utilization (%)'])
+                  for db_identifier, average_utilization in underutilized_instances:
+                      csv_writer.writerow([aws_account_id,db_identifier, average_utilization])
+                      
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction10:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: S3WithoutLifecycleConfiguration
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import botocore
+          import csv
+          import os
+          from datetime import date,datetime,timedelta
+
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              filename = 'S3WithoutLifecycleConfiguration' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              list_buckets_without_lifecycle_policy(foldername,aws_account_id)
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+
+          def list_buckets_without_lifecycle_policy(output_file,aws_account_id):
+              s3_client = boto3.client('s3')
+              response = s3_client.list_buckets()
+              buckets = response['Buckets']
+              buckets_without_lifecycle_data = []
+
+              for bucket in buckets:
+                  bucket_name = bucket['Name']
+                  try:
+                      response = s3_client.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+                  except botocore.exceptions.ClientError as e:
+                      if e.response['Error']['Code'] == 'NoSuchLifecycleConfiguration':
+                          # Bucket does not have a lifecycle policy, add it to the list
+                          buckets_without_lifecycle_data.append((bucket_name))
+              with open(output_file, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Bucket Name'])
+                  for bucket_name in buckets_without_lifecycle_data:
+                      csv_writer.writerow([aws_account_id,bucket_name])
+
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction11:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: S3LastModified
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import csv
+          import os
+          from datetime import date
+          from datetime import datetime
+          import pandas as pd
+
+          client=boto3.client("s3")
+          s3 = boto3.resource('s3')
+
+          date_today = datetime.today()
+
+          def lambda_handler(event, context):
+              account_id = []
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              s3_name = []
+              s3_date = []
+              data={'Account ID':[],'S3 Name':[], 'Last Modified Date': []}
+              response = client.list_buckets(Owner = ['self'])
+              for bucket in response['Buckets']:
+                  bucket_name = bucket['Name']
+                  try:
+                      objects = client.list_objects(Bucket=bucket_name)
+                  except:
+                      break
+                  contents = objects.get('Contents')
+                  if contents is not None:
+                      for obj in contents:
+                          date = obj['LastModified']
+                          fol = bucket_name
+                          key = fol
+                          lmd = date
+                          lmd = str(lmd).split(' ')[0]
+                      date_format = "%Y-%m-%d"
+                      temp = datetime.strptime(lmd,date_format)
+                      day_diff = (date_today-temp).days
+                      if(day_diff>=180):
+                          s3_name.append(key)
+                          s3_date.append(temp)
+                          account_id.append(aws_account_id)
+              data['Account ID'] = account_id
+              data['S3 Name'] = s3_name
+              data['Last Modified Date'] = s3_date
+              df= pd.DataFrame.from_dict(data)
+              filename = 'S3LastModified' + str(date_today.strftime('%Y-%m-%d')) + '.csv'
+              foldername = '/tmp/' + filename
+              df.to_csv(foldername,index=None)
+              filename = 'Automation-Reports/'+filename
+              result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
+              res = result.get('ResponseMetadata')
+              if res.get('HTTPStatusCode') == 200:
+                  print('File Uploaded Successfully')
+              else:
+                  print('File Not Uploaded')
+              return{
+                      'message': 'success!!'
+                  }
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction12:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: RDS-RightSizing-AIPowered
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import datetime
+          from datetime import date
+          import csv
+          import os
+          
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]), int(date_today.split(',')[1]), int(date_today.split(',')[2]))
+
+          
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              db_identity = []
+              current_type = []
+              suggested_type = []
+              rds_client = boto3.client('rds')
+              cloudwatch_client = boto3.client('cloudwatch')
+
+          
+
+              db_instances = rds_client.describe_db_instances()['DBInstances']
+
+              for db_instance in db_instances:
+                  db_instance_identifier = db_instance['DBInstanceIdentifier']
+                  # Skip serverless instances
+                  if db_instance.get('DBInstanceClass') == 'db.serverless':
+                      print("{}".format(db_instance.get('DBInstanceClass')))
+                      continue
+
+                  # Get CPU utilization metrics from CloudWatch
+                  response = cloudwatch_client.get_metric_statistics(
+                      Namespace='AWS/RDS',
+                      MetricName='CPUUtilization',
+                      Dimensions=[{'Name': 'DBInstanceIdentifier', 'Value': db_instance_identifier}],
+                      StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=10080),
+                      EndTime=datetime.datetime.utcnow(),
+                      Period=86400,  # 1 day
+                      Statistics=['Average']
+                  )
+                  if 'Datapoints' in response:
+                      datapoints = response['Datapoints']
+                      avg_cpu_utilization = sum([datapoint['Average'] for datapoint in datapoints]) / len(datapoints)
+                      suggested_instance_class = determine_suggested_instance_class(db_instance['DBInstanceClass'], avg_cpu_utilization)
+                      account_id.append(aws_account_id)
+                      db_identity.append(db_instance_identifier)
+                      current_type.append(db_instance['DBInstanceClass'])
+                      suggested_type.append(suggested_instance_class)
+                      print(f"DB Instance Identifier: {db_instance_identifier}, Suggested Instance Class: {suggested_instance_class}")
+                      
+                      
+              filename = 'RDS-RightSizing-AIPowered' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              with open(foldername, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID', 'DB Instance Identifier', 'Current Instance Class', 'Suggested Instance Class'])
+                  for i in range(0,len(account_id),1):
+                      csv_writer.writerow([account_id[i], db_identity[i], current_type[i], suggested_type[i]])
+
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/' + filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+
+          def determine_suggested_instance_class(current_instance_class, avg_cpu_utilization):
+              instance_class_mapping = {
+                  'db.t2.micro': 1,
+                  'db.t2.small': 1,
+                  'db.t2.medium': 2,
+                  'db.m5.large': 2,
+                  'db.m5.xlarge': 4,
+                  'db.m5.2xlarge': 8,
+                  # Add more instance classes as needed
+              }
+
+              utilization_thresholds = [
+                  (10, 'db.t2.micro'),   # If utilization is below 10%, suggest db.t2.micro
+                  (20, 'db.t2.small'),   # If utilization is below 20%, suggest db.t2.small
+                  (30, 'db.t2.medium'),  # If utilization is below 30%, suggest db.t2.medium
+                  (50, 'db.m5.large'),   # If utilization is below 50%, suggest db.m5.large
+                  (70, 'db.m5.xlarge'),  # If utilization is below 70%, suggest db.m5.xlarge
+                  # Add more utilization thresholds and instance classes as needed
+              ]
+
+
+              for threshold, instance_class in utilization_thresholds:
+                  if avg_cpu_utilization < threshold and instance_class_mapping[instance_class] < instance_class_mapping[current_instance_class]:
+                      return instance_class
+                  elif avg_cpu_utilization > threshold and instance_class_mapping[instance_class] > instance_class_mapping[current_instance_class]:
+                      return instance_class
+              return current_instance_class
+
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction13:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: EC2-RightSizing-AIPowered
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import datetime
+          from datetime import date
+          import csv
+          import os
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              account_id = []
+              ec2_identity = []
+              current_type = []
+              suggested_type = []
+              ec2_client = boto3.client('ec2')
+              cloudwatch_client = boto3.client('cloudwatch')
+
+              instance_list = ec2_client.describe_instances(Filters=[{
+                  'Name': 'instance-state-name',
+                  'Values': ['running']}])['Reservations']
+
+              for reservation in instance_list:
+                  for instance in reservation['Instances']:
+                      instance_id = instance['InstanceId']
+
+                      # Get CPU utilization metrics from CloudWatch
+                      response = cloudwatch_client.get_metric_statistics(
+                          Namespace='AWS/EC2',
+                          MetricName='CPUUtilization',
+                          Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
+                          StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=10080),
+                          EndTime=datetime.datetime.utcnow(),
+                          Period=86400,  # 1 day
+                          Statistics=['Average']
+                      )
+
+                      if 'Datapoints' in response:
+                          datapoints = response['Datapoints']
+                          avg_cpu_utilization = sum([datapoint['Average'] for datapoint in datapoints]) / len(datapoints)
+                          suggested_instance_type = determine_suggested_instance_type(instance['InstanceType'], avg_cpu_utilization)
+                          # suggested_instance_type = determine_suggested_instance_type('t2.medium', 10.0)
+                          account_id.append(aws_account_id)
+                          ec2_identity.append(str(instance_id))
+                          current_type.append(instance['InstanceType'])
+                          suggested_type.append(suggested_instance_type)
+                          print(f"Instance ID: {instance_id}, Suggested Instance Type: {suggested_instance_type}")
+
+                          
+              filename = 'EC2-RightSizing-AIPowered' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              with open(foldername, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Instance ID', 'Current Instance Type','Suggested Instance Type'])
+                  for i in range(0,len(account_id),1):
+                      csv_writer.writerow([account_id[i],ec2_identity[i], current_type[i],suggested_type[i]])
+                              
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+
+          def determine_suggested_instance_type(current_instance_type, avg_cpu_utilization):
+            # Define a mapping of instance types and their corresponding vCPUs
+              instance_type_mapping = {
+                't2.micro': 1,
+                't2.small': 1,
+                't2.medium': 2,
+                'm5.large': 2,
+                'm5.xlarge': 4,
+                'm5.2xlarge': 8,
+                # Add more instance types as needed
+              }
+
+            # Define utilization thresholds and their corresponding recommended instance types
+              utilization_thresholds = [
+                (10, 't2.micro'),   # If utilization is below 10%, suggest t2.micro
+                (20, 't2.small'),   # If utilization is below 20%, suggest t2.small
+                (30, 't2.medium'),  # If utilization is below 30%, suggest t2.medium
+                (50, 'm5.large'),   # If utilization is below 50%, suggest m5.large
+                (70, 'm5.xlarge'),  # If utilization is below 70%, suggest m5.xlarge
+                # Add more utilization thresholds and instance types as needed
+              ]
+
+              for threshold, instance_type in utilization_thresholds:
+              #   print("Threshold: {}, Instance Type: {}".format(threshold,instance_type))
+                  print(threshold)
+                  if avg_cpu_utilization < threshold and instance_type_mapping[instance_type] < instance_type_mapping[current_instance_type]:
+                      # print('Hi in 1st if')
+                      return instance_type
+                  elif(avg_cpu_utilization > threshold and instance_type_mapping[instance_type] > instance_type_mapping[current_instance_type]):
+                      # print('Hi in 2nd if')
+                      return instance_type  
+              return current_instance_type
+
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
+  costOptimizationLambdaFunction14:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CWExpirationCheck
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - LambdaRole
+        - Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import csv
+          import os
+          import datetime
+          from datetime import date,datetime,timedelta
+
+
+          date_today = date.today()
+          date_today = date_today.strftime("%Y,%m,%d")
+          date_today = date(int(date_today.split(',')[0]),int(date_today.split(',')[1]),int(date_today.split(',')[2]))
+
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              filename = 'CWExpirationCheck' + str(date_today) + '.csv'
+              foldername = '/tmp/' + filename
+              list_log_groups_without_retention_policy(foldername,aws_account_id)
+              s3_bucket_name = os.environ['BucketName']
+              filename = 'Automation-Reports/'+filename
+              upload_to_s3(foldername, s3_bucket_name, filename)
+
+              
+          def list_log_groups_without_retention_policy(output_file, aws_account_id):
+              # Initialize Boto3 client for CloudWatch Logs
+              logs_client = boto3.client('logs')
+
+              # Describe all log groups
+              response = logs_client.describe_log_groups()
+              log_groups = response['logGroups']
+
+              # Find log groups without a retention policy and write to CSV file
+              log_groups_without_retention_data = []
+
+              for log_group in log_groups:
+                  if 'retentionInDays' not in log_group:
+                      log_groups_without_retention_data.append((log_group['logGroupName']))
+
+              with open(output_file, 'w', newline='') as csvfile:
+                  csv_writer = csv.writer(csvfile)
+                  csv_writer.writerow(['Account ID','Log Group Name'])
+                  for log_group_name in log_groups_without_retention_data:
+                      csv_writer.writerow([aws_account_id,log_group_name])
+                      
+          def upload_to_s3(file_path, bucket_name, object_key):
+              s3_client = boto3.client('s3')
+              with open(file_path, 'rb') as file:
+                  s3_client.upload_fileobj(file, bucket_name, object_key)
+      Runtime: python3.8
+      PackageType: Zip
+      Environment:
+        Variables:
+          BucketName:
+            Fn::ImportValue: S3CostOptimizationBucket
+      Layers:
+      - arn:aws:lambda:ap-south-1:770693421928:layer:Klayers-p38-pandas:16
+      Timeout:
+        Ref: Timeout
+      MemorySize:
+        Ref: MemorySize
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRole
+
   costOptimizationLambdaFunctionScheduledRule01:
     Type: AWS::Events::Rule
     Properties:
@@ -109,18 +1258,246 @@ Resources:
       Targets:
       - Arn:
           Fn::GetAtt:
-          - costOptimizationLambdaFunction
+          - costOptimizationLambdaFunction01
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction02
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction03
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction04
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction05
           - Arn
         Id: TargetFunctionV1
-    DependsOn: costOptimizationLambdaFunction
-  PermissionForEventsToInvokecostOptimizationLambda:
+    DependsOn: [costOptimizationLambdaFunction01, costOptimizationLambdaFunction02, costOptimizationLambdaFunction03, costOptimizationLambdaFunction04, costOptimizationLambdaFunction05]
+
+  costOptimizationLambdaFunctionScheduledRule02:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(2 minutes)
+      State: ENABLED
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction06
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction07
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction08
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction09
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction10
+          - Arn
+        Id: TargetFunctionV1
+    DependsOn: [costOptimizationLambdaFunction06, costOptimizationLambdaFunction07, costOptimizationLambdaFunction08, costOptimizationLambdaFunction09, costOptimizationLambdaFunction10]
+
+  costOptimizationLambdaFunctionScheduledRule03:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(2 minutes)
+      State: ENABLED
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction11
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction12
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction13
+          - Arn
+      - Arn:
+          Fn::GetAtt:
+          - costOptimizationLambdaFunction14
+          - Arn
+        Id: TargetFunctionV1
+    DependsOn: [costOptimizationLambdaFunction11, costOptimizationLambdaFunction12, costOptimizationLambdaFunction13, costOptimizationLambdaFunction14]
+
+  
+  PermissionForEventsToInvokecostOptimizationLambda01:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName:
-        Ref: costOptimizationLambdaFunction
+        Ref: costOptimizationLambdaFunction01
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn:
         Fn::GetAtt:
         - costOptimizationLambdaFunctionScheduledRule01
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda02:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction02
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule01
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda03:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction03
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule01
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda04:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction04
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule01
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda05:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction05
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule01
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda06:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction06
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule02
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda07:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction07
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule02
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda08:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction08
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule02
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda09:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction09
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule02
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda10:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction10
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule02
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda11:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction11
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule03
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda12:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction12
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule03
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda13:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction13
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule03
+        - Arn
+
+  PermissionForEventsToInvokecostOptimizationLambda14:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: costOptimizationLambdaFunction14
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - costOptimizationLambdaFunctionScheduledRule03
         - Arn

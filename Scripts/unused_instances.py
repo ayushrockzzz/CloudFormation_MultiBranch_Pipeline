@@ -4,6 +4,9 @@ import boto3
 import pandas as pd
 from datetime import datetime
 from datetime import date
+import os
+
+
 client=boto3.client('ec2')
 resp=client.describe_instances(Filters=[{'Name':'instance-state-name','Values':['stopped']}])
 date_today = date.today()
@@ -54,7 +57,7 @@ def lambda_handler(event, context):
     foldername = '/tmp/' + filename
     df.to_csv(foldername,index=None)
     filename = 'Automation-Reports/'+filename
-    result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket='automation-team-pranad-ayush-jayant-s3-backend', Key=filename)
+    result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
     res = result.get('ResponseMetadata')
     if res.get('HTTPStatusCode') == 200:
         print('File Uploaded Successfully')

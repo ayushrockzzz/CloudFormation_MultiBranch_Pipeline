@@ -3,6 +3,8 @@ import boto3
 import pandas as pd
 import datetime
 from datetime import date
+import os
+
 client = boto3.client('ec2')
 s3 = boto3.resource('s3')
 
@@ -45,7 +47,7 @@ def lambda_handler(event,context):
     df.to_csv(foldername,index=None)
     # filename = filename + filename
     filename = 'Automation-Reports/'+filename
-    result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket='automation-team-pranad-ayush-jayant-s3-backend', Key=filename)
+    result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
     res = result.get('ResponseMetadata')
     if res.get('HTTPStatusCode') == 200:
         print('File Uploaded Successfully')
