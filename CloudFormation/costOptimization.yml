@@ -37,6 +37,9 @@ Resources:
             - ec2:*
             - s3:*
             - kms:*
+            - logs:*
+            - elasticfilesystem:Describe*
+            - rds:Describe*
             Resource: "*"
 
   costOptimizationLambdaFunction01:
