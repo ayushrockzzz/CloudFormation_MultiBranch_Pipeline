@@ -1260,18 +1260,22 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction01
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction02
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction03
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction04
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction05
@@ -1289,18 +1293,22 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction06
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction07
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction08
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction09
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction10
@@ -1318,14 +1326,17 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction11
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction12
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction13
           - Arn
+        Id: TargetFunctionV1
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction14
