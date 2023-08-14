@@ -14,28 +14,35 @@ pipeline {
            }
        }
 
-    stage('Ready for Cost Optimization ?') {
-      input {
-        message "Are you running this Framework in your Account for the FIRST TIME ?"
-        ok "Yes!"
-      }
-      steps {
-        script {
-            sh """
-                aws cloudformation deploy \\
-                    --region \$AWS_DEFAULT_REGION \\
-                    --template-file CloudFormation/s3bucket.yml \\
-                    --stack-name CostOptimizationS3Bucket
-            """
+       stage('Ready for Cost Optimization ?') {
+           input {
+               message "Are you running this Framework in your Account for the FIRST TIME ?"
+               ok "Yes!"
+               parameters {
+                   booleanParam(name: 'skipCostOptimization', defaultValue: false, description: 'Skip Cost Optimization Stage')
                }
-      }
-    }
+           }
+           steps {
+               script {
+                   if (!params.skipCostOptimization) {
+                       sh """
+                           aws cloudformation deploy \\
+                               --region \$AWS_DEFAULT_REGION \\
+                               --template-file CloudFormation/s3bucket.yml \\
+                               --stack-name CostOptimizationS3Bucket
+                       """
+                   } else {
+                       echo "Skipping Cost Optimization"
+                   }
+               }
+           }
+       }
 
-    stage('Gathering Pre-Processors') {
-      steps {
-        sh "sleep 5"
-      }
-    }
+       stage('Gathering Pre-Processors') {
+           steps {
+               sh "sleep 5"
+           }
+       }
 
        stage('Cost Optimization Framework Deployment in Progress') {
            steps {
@@ -52,21 +59,24 @@ pipeline {
                }
            }
        }
-    stage('Calculating Cost($) Savings!!') {
-      steps {
-        echo "Cost Optimization lever deployed! Still, we are fetching tentative savings for you!"
-        sh "sleep 180"
-      }
-    }
-    stage('Done!! Do you want to Cleanup ?') {
-      input {
-        message "Are you sure?"
-        ok "Go Ahead!"
-      }
-      steps {
-        echo 'Accepted'
-      }
-    }
+
+       stage('Calculating Cost($) Savings!!') {
+           steps {
+               echo "Cost Optimization lever deployed! Still, we are fetching tentative savings for you!"
+               sh "sleep 180"
+           }
+       }
+
+       stage('Done!! Do you want to Cleanup ?') {
+           input {
+               message "Are you sure?"
+               ok "Go Ahead!"
+           }
+           steps {
+               echo 'Accepted'
+           }
+       }
+
        stage('Cleanup in Progress') {
            steps {
                script {
