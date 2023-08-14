@@ -1260,27 +1260,27 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction01
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction01
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction02
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction02
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction03
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction03
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction04
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction04
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction05
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction05
     DependsOn: [costOptimizationLambdaFunction01, costOptimizationLambdaFunction02, costOptimizationLambdaFunction03, costOptimizationLambdaFunction04, costOptimizationLambdaFunction05]
 
   costOptimizationLambdaFunctionScheduledRule02:
@@ -1293,27 +1293,27 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction06
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction06
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction07
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction07
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction08
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction08
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction09
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction09
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction10
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction10
     DependsOn: [costOptimizationLambdaFunction06, costOptimizationLambdaFunction07, costOptimizationLambdaFunction08, costOptimizationLambdaFunction09, costOptimizationLambdaFunction10]
 
   costOptimizationLambdaFunctionScheduledRule03:
@@ -1326,22 +1326,22 @@ Resources:
           Fn::GetAtt:
           - costOptimizationLambdaFunction11
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction11
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction12
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction12
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction13
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction13
       - Arn:
           Fn::GetAtt:
           - costOptimizationLambdaFunction14
           - Arn
-        Id: TargetFunctionV1
+        Id: TargetFunction14
     DependsOn: [costOptimizationLambdaFunction11, costOptimizationLambdaFunction12, costOptimizationLambdaFunction13, costOptimizationLambdaFunction14]
 
   
