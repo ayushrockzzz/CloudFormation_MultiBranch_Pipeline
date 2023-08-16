@@ -1136,6 +1136,7 @@ Resources:
                 't2.medium': 2,
                 'm5.large': 2,
                 'm5.xlarge': 4,
+                't2.xlarge': 4,
                 'm5.2xlarge': 8,
                 # Add more instance types as needed
               }
@@ -1146,6 +1147,7 @@ Resources:
                 (20, 't2.small'),   # If utilization is below 20%, suggest t2.small
                 (30, 't2.medium'),  # If utilization is below 30%, suggest t2.medium
                 (50, 'm5.large'),   # If utilization is below 50%, suggest m5.large
+                (60, 't2.xlarge'),  # If utilization is below 60%, suggest t2.xlarge
                 (70, 'm5.xlarge'),  # If utilization is below 70%, suggest m5.xlarge
                 # Add more utilization thresholds and instance types as needed
               ]
