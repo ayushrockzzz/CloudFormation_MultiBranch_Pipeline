@@ -81,7 +81,7 @@ Resources:
                   
               data['Snapshot IDs(unassociated with AMI)'] = snapshot_unassociated
               df=pd.DataFrame.from_dict(data)
-              filename = 'UnassociatedSnapshots' + str(date_today) + '.csv'
+              filename = 'UnassociatedSnapshots.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -131,7 +131,7 @@ Resources:
 
           def lambda_handler(event, context):
               aws_account_id = context.invoked_function_arn.split(":")[4]
-              filename = 'UnusedRDS' + str(date_today) + '.csv'
+              filename = 'UnusedRDS.csv'
               foldername = '/tmp/' + filename
               list_unused_stopped_rds_instances(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
@@ -215,7 +215,7 @@ Resources:
 
           def lambda_handler(event, context):
               aws_account_id = context.invoked_function_arn.split(":")[4]
-              filename = 'UnusedEFS' + str(date_today) + '.csv'
+              filename = 'UnusedEFS.csv'
               foldername = '/tmp/' + filename
               unused_volumes_file = list_unused_efs_volumes(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
@@ -308,7 +308,7 @@ Resources:
               data['Unused Elastic IPs']=unused_eips
               df=pd.DataFrame.from_dict(data)
 
-              filename = 'UnusedElasticIps' + str(date_today) + '.csv'
+              filename = 'UnusedElasticIps.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -403,7 +403,7 @@ Resources:
               data['Private IP'] = ip_address_list
               data['Instance is Stopped from(days)']=Diff_List
               df=pd.DataFrame.from_dict(data)
-              filename = 'StoppedInstances' + str(date_today) + '.csv'
+              filename = 'StoppedInstances.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -472,7 +472,7 @@ Resources:
               data['Volume ID']=unused_vols_id
               data['Free Space'] = Size
               df=pd.DataFrame.from_dict(data)
-              filename = 'UnusedVolume' + str(date_today) + '.csv'
+              filename = 'UnusedVolume.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -553,7 +553,7 @@ Resources:
               data['AMI Age(days old)'] = ami_age
               df=pd.DataFrame.from_dict(data)
               # df.to_csv('\\UnusedAMI.csv',index=None)
-              filename = 'UnusedAMI' + str(date_today) + '.csv'
+              filename = 'UnusedAMI.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               # filename = filename + filename
@@ -646,7 +646,7 @@ Resources:
                       utilization_list.append(str(weekAvg) + '%')
                       account_id.append(aws_account_id)
               df = pd.DataFrame({'Account ID': account_id,'Instance ID': instance_id_list, 'Weekly Average CPU Utilization <20%': utilization_list})
-              filename = 'UnderUtilizedEC2' + str(date_today) + '.csv'
+              filename = 'UnderUtilizedEC2.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -699,7 +699,7 @@ Resources:
 
           def lambda_handler(event, context):
               aws_account_id = context.invoked_function_arn.split(":")[4]
-              filename = 'UnderutilizedRDS' + str(date_today) + '.csv'
+              filename = 'UnderutilizedRDS.csv'
               foldername = '/tmp/' + filename
               list_underutilized_rds_instances(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
@@ -799,7 +799,7 @@ Resources:
 
           def lambda_handler(event, context):
               aws_account_id = context.invoked_function_arn.split(":")[4]
-              filename = 'S3WithoutLifecycleConfiguration' + str(date_today) + '.csv'
+              filename = 'S3WithoutLifecycleConfiguration.csv'
               foldername = '/tmp/' + filename
               list_buckets_without_lifecycle_policy(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
@@ -901,7 +901,7 @@ Resources:
               data['S3 Name'] = s3_name
               data['Last Modified Date'] = s3_date
               df= pd.DataFrame.from_dict(data)
-              filename = 'S3LastModified' + str(date_today.strftime('%Y-%m-%d')) + '.csv'
+              filename = 'S3LastModified.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               filename = 'Automation-Reports/'+filename
@@ -995,7 +995,7 @@ Resources:
                       print(f"DB Instance Identifier: {db_instance_identifier}, Suggested Instance Class: {suggested_instance_class}")
                       
                       
-              filename = 'RDS-RightSizing-AIPowered' + str(date_today) + '.csv'
+              filename = 'RDS-RightSizing-AIPowered.csv'
               foldername = '/tmp/' + filename
               with open(foldername, 'w', newline='') as csvfile:
                   csv_writer = csv.writer(csvfile)
@@ -1116,7 +1116,7 @@ Resources:
                           print(f"Instance ID: {instance_id}, Suggested Instance Type: {suggested_instance_type}")
 
                           
-              filename = 'EC2-RightSizing-AIPowered' + str(date_today) + '.csv'
+              filename = 'EC2-RightSizing-AIPowered.csv'
               foldername = '/tmp/' + filename
               with open(foldername, 'w', newline='') as csvfile:
                   csv_writer = csv.writer(csvfile)
@@ -1205,7 +1205,7 @@ Resources:
 
           def lambda_handler(event, context):
               aws_account_id = context.invoked_function_arn.split(":")[4]
-              filename = 'CWExpirationCheck' + str(date_today) + '.csv'
+              filename = 'CWExpirationCheck.csv'
               foldername = '/tmp/' + filename
               list_log_groups_without_retention_policy(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
