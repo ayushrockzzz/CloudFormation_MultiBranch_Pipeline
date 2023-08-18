@@ -64,7 +64,6 @@ pipeline {
            steps {
                echo "Cost Optimization lever deployed! Still, we are fetching tentative savings for you!"
                sh "sleep 180"
-               message "Tentative Cost savings is around USD 31.7 "
            }
        }
 
