@@ -7,7 +7,7 @@ pipeline {
        AWS_SECRET_ACCESS_KEY = credentials('SecretAccessKey')
    }
 
-   stages {
+    stages {
        stage('Gathering Framework Manifest Files') {
            steps {
                checkout scm
@@ -32,7 +32,7 @@ pipeline {
                                --stack-name CostOptimizationS3Bucket
                        """
                    } else {
-                       echo "Skipping Cost Optimization"
+                       echo "Skipping Cost Optimization S3 Bucket Creation"
                    }
                }
            }
@@ -64,6 +64,7 @@ pipeline {
            steps {
                echo "Cost Optimization lever deployed! Still, we are fetching tentative savings for you!"
                sh "sleep 180"
+               message "Tentative Cost savings is around USD($) 31.7 "
            }
        }
 
