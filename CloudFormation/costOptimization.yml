@@ -84,7 +84,7 @@ Resources:
               filename = 'UnassociatedSnapshots.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -135,7 +135,7 @@ Resources:
               foldername = '/tmp/' + filename
               list_unused_stopped_rds_instances(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(foldername, s3_bucket_name, filename)
               
           def list_unused_stopped_rds_instances(output_file, aws_account_id):
@@ -219,7 +219,7 @@ Resources:
               foldername = '/tmp/' + filename
               unused_volumes_file = list_unused_efs_volumes(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(unused_volumes_file, s3_bucket_name, filename)
               
           def list_unused_efs_volumes(output_file,aws_account_id):
@@ -311,7 +311,7 @@ Resources:
               filename = 'UnusedElasticIps.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -406,7 +406,7 @@ Resources:
               filename = 'StoppedInstances.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -475,7 +475,7 @@ Resources:
               filename = 'UnusedVolume.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -557,7 +557,7 @@ Resources:
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
               # filename = filename + filename
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -649,7 +649,7 @@ Resources:
               filename = 'UnderUtilizedEC2.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -703,7 +703,7 @@ Resources:
               foldername = '/tmp/' + filename
               list_underutilized_rds_instances(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(foldername, s3_bucket_name, filename)
               
           def list_underutilized_rds_instances(output_file,aws_account_id):
@@ -803,7 +803,7 @@ Resources:
               foldername = '/tmp/' + filename
               list_buckets_without_lifecycle_policy(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(foldername, s3_bucket_name, filename)
 
           def list_buckets_without_lifecycle_policy(output_file,aws_account_id):
@@ -904,7 +904,7 @@ Resources:
               filename = 'S3LastModified.csv'
               foldername = '/tmp/' + filename
               df.to_csv(foldername,index=None)
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               result = s3.meta.client.put_object(Body=open(foldername, 'rb'), Bucket=os.environ['BucketName'], Key=filename)
               res = result.get('ResponseMetadata')
               if res.get('HTTPStatusCode') == 200:
@@ -1004,7 +1004,7 @@ Resources:
                       csv_writer.writerow([account_id[i], db_identity[i], current_type[i], suggested_type[i]])
 
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/' + filename
+              filename = 'Reports/' + filename
               upload_to_s3(foldername, s3_bucket_name, filename)
 
           def determine_suggested_instance_class(current_instance_class, avg_cpu_utilization):
@@ -1125,7 +1125,7 @@ Resources:
                       csv_writer.writerow([account_id[i],ec2_identity[i], current_type[i],suggested_type[i]])
                               
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(foldername, s3_bucket_name, filename)
 
           def determine_suggested_instance_type(current_instance_type, avg_cpu_utilization):
@@ -1211,7 +1211,7 @@ Resources:
               foldername = '/tmp/' + filename
               list_log_groups_without_retention_policy(foldername,aws_account_id)
               s3_bucket_name = os.environ['BucketName']
-              filename = 'Automation-Reports/'+filename
+              filename = 'Reports/'+filename
               upload_to_s3(foldername, s3_bucket_name, filename)
 
               
